@@ -96,6 +96,8 @@ for i=1,model:size() do
 end
 
 ---- Sets the deathRate (1 - survival probability) for all residual blocks  ----
+
+-- TODO: replace death rates with 'alphas', which should be trainable variables, and add them to some list
 for i,block in ipairs(addtables) do
   if opt.deathMode == 'uniform' then
     model:get(block).deathRate = opt.deathRate
@@ -148,6 +150,8 @@ function accounting(training_time)
       sgdState.epochCounter, results[1]*100, results[2]*100, training_time))
   end
 end
+
+-- TODO: add a function to do a forward pass on the validation set and backprop w.r.t. the alphas
 
 ---- Training ----
 function main()  
