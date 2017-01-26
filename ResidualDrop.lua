@@ -10,7 +10,12 @@ function ResidualDrop:__init(deathRate, nChannels, nOutChannels, stride)
     self.gradInput = torch.Tensor()
     self.gate = true
     self.train = true
+    
+    -- DEATH RATE HERE
+    -- TODO: ensure this is a trainable variable, but NOT a parameter of the ResidualDrop or net
     self.deathRate = deathRate
+    
+    
     nOutChannels = nOutChannels or nChannels
     stride = stride or 1
 
@@ -54,6 +59,7 @@ function ResidualDrop:updateOutput(input)
     return self.output
 end
 
+-- TODO: add gradient calculation for when not self.train
 function ResidualDrop:updateGradInput(input, gradOutput)
    self.gradInput = self.gradInput or input.new()
    self.gradInput:resizeAs(input):copy(self.skip:updateGradInput(input, gradOutput))
@@ -63,6 +69,7 @@ function ResidualDrop:updateGradInput(input, gradOutput)
    return self.gradInput
 end
 
+-- TODO: add gradient calculation for when not self.train
 function ResidualDrop:accGradParameters(input, gradOutput, scale)
    scale = scale or 1
    if self.gate then
