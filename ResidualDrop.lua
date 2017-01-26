@@ -12,9 +12,10 @@ function ResidualDrop:__init(deathRate, nChannels, nOutChannels, stride)
     self.train = true
     
     -- DEATH RATE HERE
-    -- TODO: ensure this is a trainable variable, but NOT a parameter of the ResidualDrop or net
+    -- TODO: replace with alpha. ensure this is a trainable variable, but NOT a parameter of the ResidualDrop or net
     self.deathRate = deathRate
     
+    -- TODO: replace the computations where deathRate is used with sigmoid(alpha)
     
     nOutChannels = nOutChannels or nChannels
     stride = stride or 1
