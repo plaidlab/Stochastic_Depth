@@ -111,10 +111,10 @@ init_alphas = {}
 for i,block in ipairs(addtables) do
   if opt.deathMode == 'uniform' then
     local init_alpha = torch.log(1 - opt.deathRate)
-    model:get(block).init_alpha = torch.Tensor(1):zero():fill(init_alpha)
+    model:get(block).init_alpha = torch.Tensor(1):zero():fill(init_alpha):cuda()
   elseif opt.deathMode == 'lin_decay' then
     local init_alpha = torch.log(1 - (i / #addtables * opt.deathRate))
-    model:get(block).init_alpha = torch.Tensor(1):zero():fill(init_alpha)
+    model:get(block).init_alpha = torch.Tensor(1):zero():fill(init_alpha):cuda()
   else
     print('Invalid argument for deathMode!')
   end
