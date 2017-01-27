@@ -8,7 +8,7 @@ local AlphaLearner, parent = torch.class('nn.AlphaLearner', 'nn.Container')
 
 local ResidualDrop, parent = torch.class('nn.ResidualDrop', 'nn.Container')
 
-function ResidualDrop:__init(deathRate, nChannels, nOutChannels, stride)
+function ResidualDrop:__init(init_alpha, nChannels, nOutChannels, stride)
     parent.__init(self)
     self.gradInput = torch.Tensor()
     self.gate = true
@@ -17,7 +17,7 @@ function ResidualDrop:__init(deathRate, nChannels, nOutChannels, stride)
 
     -- DEATH RATE HERE
     -- TODO: replace with alpha. ensure this is a trainable variable, but NOT a parameter of the ResidualDrop or net
-    self.init_alpha = torch.Tensor(1):zero():fill(init_alpha)
+    self.init_alpha = init_alpha
 
     self.alpha_learner = nn.Sequential()
     self.alpha_learner.add(nn.Add(1))
@@ -99,8 +99,8 @@ function ResidualDrop:accGradParameters(input, gradOutput, scale)
 end
 
 ---- Adds a residual block to the passed in model ----
-function addResidualDrop(model, deathRate, nChannels, nOutChannels, stride)
-   model:add(nn.ResidualDrop(deathRate, nChannels, nOutChannels, stride))
+function addResidualDrop(model, init_alpha, nChannels, nOutChannels, stride)
+   model:add(nn.ResidualDrop(init_alpha, nChannels, nOutChannels, stride))
    model:add(cudnn.ReLU(true))
    return model
 end
