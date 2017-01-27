@@ -105,13 +105,18 @@ end
 
 ---- Sets the deathRate (1 - survival probability) for all residual blocks  ----
 
-init_alphas = {}
-
 -- TODO: replace death rates with 'alphas', which should be trainable variables, and add them to some list
 for i,block in ipairs(addtables) do
   if opt.deathMode == 'uniform' then
+    -- for convenience, have set alpha to log of 1 - drop_probability
+    -- this lets us think of alpha as proportional to keep_prob, per paper and discussions
+
+    -- here we set init_alpha according to their schedule
     local init_alpha = torch.log(1 - opt.deathRate)
+
+    -- block.init_alpha must be a Tensor (as used as input to a Module) but is only size 1
     model:get(block).init_alpha = torch.FloatTensor(1):zero():fill(init_alpha):cuda()
+
   elseif opt.deathMode == 'lin_decay' then
     local init_alpha = torch.log(1 - (i / #addtables * opt.deathRate))
     model:get(block).init_alpha = torch.FloatTensor(1):zero():fill(init_alpha):cuda()
@@ -220,14 +225,31 @@ function main()
             return loss_val, gradients
         end
 
+        -- first do a step of sgd against the net parameters. by turning off dev we fix alphas..
+        undev()
         optim.sgd(train_eval, weights, sgdState)
 
+        -- now open gates, set dev mode
         openAllGates()
         dev()
 
-        optim.sgd(train_eval, weights, dev_sgdState)
+        -- i have no idea if we really need to redefine this fn or could use train_eval from before.
+        -- will need to test it out.
+        function dev_eval(x)
+            gradients:zero()
+            local batch = dataTrain:sampleIndices(batches[i])
+            local inputs, labels = batch.inputs, batch.outputs:long()
+            inputs = inputs:cuda()
+            labels = labels:cuda()
+            local y = model:forward(inputs)
+            local loss_val = loss:forward(y, labels)
+            local dl_df = loss:backward(y, labels)
+            model:backward(inputs, dl_df)
+            return loss_val, gradients
+        end
 
-        undev()
+        -- now do step of sgd against alphas. by setting dev mode we fix net parameters.
+        optim.sgd(dev_eval, weights, dev_sgdState)
 
         if opt.dataset == 'svhn' then
           if sgdState.iterCounter % 200 == 0 then
