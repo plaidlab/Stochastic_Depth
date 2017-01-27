@@ -59,7 +59,7 @@ function ResidualDrop:updateOutput(input)
     local skip_forward = self.skip:forward(input)
     self.output:resizeAs(skip_forward):copy(skip_forward)
     if self.dev then
-      self.output:add(self.net:forward(input):mul(self.alpha_learner:forward(self.init_alpha)))
+      self.output:add(self.net:forward(input):mul(self.alpha_learner:forward(self.init_alpha)[1]))
     elseif self.train then
       if self.gate then -- only compute convolutional output when gate is open
         self.output:add(self.net:forward(input))
