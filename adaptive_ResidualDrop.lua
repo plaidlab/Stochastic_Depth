@@ -20,8 +20,8 @@ function ResidualDrop:__init(init_alpha, nChannels, nOutChannels, stride)
     self.init_alpha = init_alpha
 
     self.alpha_learner = nn.Sequential()
-    self.alpha_learner.add(nn.Add(1))
-    self.alpha_learner.add(nn.Sigmoid())
+    self.alpha_learner:add(nn.Add(1))
+    self.alpha_learner:add(nn.Sigmoid())
 
     -- TODO: replace the computations where deathRate is used with sigmoid(alpha)
 
