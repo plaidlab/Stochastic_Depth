@@ -5,7 +5,7 @@ require 'cudnn'
 require 'optim'
 local nninit = require 'nninit'
 
-require 'ResidualDrop'
+require 'adaptive_ResidualDrop'
 
 -- Saves 40% time according to http://torch.ch/blog/2016/02/04/resnets.html
 cudnn.fastest = true
