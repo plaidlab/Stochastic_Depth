@@ -59,7 +59,8 @@ function ResidualDrop:updateOutput(input)
     local skip_forward = self.skip:forward(input)
     self.output:resizeAs(skip_forward):copy(skip_forward)
     if self.dev then
-      self.output:add(self.net:forward(input):mul(self.alpha_learner:forward(self.init_alpha)[1]))
+      -- note mul must be with a scalar value contained in a tensor, NOT a tensor
+      self.output:add(self.net:forward(input):mul(self.alpha_learner.output[1]))
     elseif self.train then
       if self.gate then -- only compute convolutional output when gate is open
         self.output:add(self.net:forward(input))
@@ -74,7 +75,8 @@ function ResidualDrop:updateGradInput(input, gradOutput)
    self.gradInput:resizeAs(input):copy(self.skip:updateGradInput(input, gradOutput))
    if self.dev then
         -- y = x + layer_weighting * f(x) so dy/dx = layer_weighting * df(x)/dx
-        self.gradInput:add(self.net:updateGradInput(input, gradOutput):mul(self.alpha_learner.output))
+        -- note mul must be with a scalar value contained in a tensor, NOT a tensor
+        self.gradInput:add(self.net:updateGradInput(input, gradOutput):mul(self.alpha_learner.output[1]))
    elseif self.train then
         if self.gate then
             -- y = x + f(x) so dy/dx = df(x)/dx
@@ -88,8 +90,9 @@ end
 function ResidualDrop:accGradParameters(input, gradOutput, scale)
    scale = scale or 1
    if self.dev then
-        -- y = x + g(alpha) * f(x) so given dL / dy, dL / dalpha = (dL / dy) (dg/dalpha * f(x))
-       self.alpha_learner:accGradParameters(self.init_alpha, gradOutput:mul(self.net.output), scale)
+        -- y = x + g(alpha) * f(x) so given dL / dy, dL / dalpha = (dL / dy) (dg/dalpha * f(x)) = (dL / dy * f(x)) * dg/dalpha
+        -- note cmul is elementwise
+       self.alpha_learner:accGradParameters(self.init_alpha, gradOutput:cmul(self.net.output), scale)
    elseif self.train then
        if self.gate then
           -- y = x + f_theta (x) so given dL / dy, dL / dtheta = (dL / dy) (df(x) / dtheta)
