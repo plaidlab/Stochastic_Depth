@@ -8,9 +8,16 @@ local nninit = require 'nninit'
 require 'ResidualDrop'
 
 -- Saves 40% time according to http://torch.ch/blog/2016/02/04/resnets.html
+-- FFT based convolutions via CuDNN-4 : Using the CuDNN Torch bindings, one can
+-- select the fastest convolution kernels by setting cudnn.fastest and
+-- cudnn.benchmark to true. This automatically benchmarks each possible
+-- algorithm on your GPU and chooses the fastest one. This sped up the time
+-- per-mini-batch by about 40% on a single GPU, but slowed down the multi-GPU
+-- case due to the additional kernel launch overhead.
 cudnn.fastest = true
 cudnn.benchmark = true
 
+-- From the Penlight Lua Libraries (https://github.com/stevedonovan/Penlight)
 opt = lapp[[
   --maxEpochs     (default 500)         Maximum number of epochs to train the network
   --batchSize     (default 128)         Mini-batch size
@@ -19,7 +26,7 @@ opt = lapp[[
   --deathMode     (default lin_decay)   Use lin_decay or uniform
   --deathRate     (default 0)           1-p_L for lin_decay, 1-p_l for uniform, 0 is constant depth
   --device        (default 0)           Which GPU to run on, 0-based indexing
-  --augmentation  (default true)        Standard data augmentation (CIFAR only), true or false 
+  --augmentation  (default true)        Standard data augmentation (CIFAR only), true or false
   --resultFolder  (default "")          Path to the folder where you'd like to save results
   --dataRoot      (default "")          Path to data (e.g. contains cifar10-train.t7)
 ]]
@@ -50,7 +57,7 @@ sgdState = {
    nesterov      = true,
 }
 -- Point at which learning rate decrease by 10x
-lrSchedule = {svhn     = {0.6, 0.7 }, 
+lrSchedule = {svhn     = {0.6, 0.7 },
               cifar10  = {0.5, 0.75},
               cifar100 = {0.5, 0.75}}
 
@@ -140,13 +147,13 @@ function accounting(training_time)
   local results = {evalModel(dataValid), evalModel(dataTest)}
   all_results[#all_results + 1] = results
   -- Saves the errors. These get covered up by new ones every time the function is called
-  torch.save(opt.resultFolder .. string.format('errors_%d_%s_%s_%.1f', 
+  torch.save(opt.resultFolder .. string.format('errors_%d_%s_%s_%.1f',
     opt.N, opt.dataset, opt.deathMode, opt.deathRate), all_results)
-  if opt.dataset == 'svhn' then 
-    print(string.format('Iter %d:\t%.2f%%\t\t%.2f%%\t\t%0.0fs', 
+  if opt.dataset == 'svhn' then
+    print(string.format('Iter %d:\t%.2f%%\t\t%.2f%%\t\t%0.0fs',
       sgdState.iterCounter, results[1]*100, results[2]*100, training_time))
   else
-    print(string.format('Epoch %d:\t%.2f%%\t\t%.2f%%\t\t%0.0fs', 
+    print(string.format('Epoch %d:\t%.2f%%\t\t%.2f%%\t\t%0.0fs',
       sgdState.epochCounter, results[1]*100, results[2]*100, training_time))
   end
 end
@@ -154,11 +161,11 @@ end
 -- TODO: add a function to do a forward pass on the validation set and backprop w.r.t. the alphas
 
 ---- Training ----
-function main()  
+function main()
   local weights, gradients = model:getParameters()
   sgdState.epochCounter  = 1
-  if opt.dataset == 'svhn' then 
-    sgdState.iterCounter = 1 
+  if opt.dataset == 'svhn' then
+    sgdState.iterCounter = 1
     print('Training...\nIter\t\tValid. err\tTest err\tTraining time')
   else
     print('Training...\nEpoch\tValid. err\tTest err\tTraining time')
@@ -208,11 +215,11 @@ function main()
     if opt.dataset ~= 'svhn' then
       accounting(timer:time().real)
       timer:reset()
-    end    
+    end
     sgdState.epochCounter = sgdState.epochCounter + 1
   end
   -- Saves the the last model, optional. Model loading feature is not available now but is easy to add
-  -- torch.save(opt.resultFolder .. string.format('model_%d_%s_%s_%.1f', 
+  -- torch.save(opt.resultFolder .. string.format('model_%d_%s_%s_%.1f',
   --    opt.N, opt.dataset, opt.deathMode, opt.deathRate), model)
 end
 

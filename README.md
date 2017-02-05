@@ -29,7 +29,7 @@ mkdir results
 th main.lua -dataRoot cifar.torch/ -resultFolder results/ -deathRate 0.5
 ```
 
-### Usage Details
+### Usage Details[
 `th main.lua -dataRoot path_to_data -resultFolder path_to_save -deathRate 0.5`<br/>
 This command runs the 110-layer ResNet on CIFAR-10 with stochastic depth, using _linear decay_ survival probabilities ending in 0.5. The `-device` flag allows you to specify which GPU to run on. On our machine with a TITAN X, each epoch takes about 60 seconds, and the program ends with a test error (selected by best validation error) of __5.25%__.
 
