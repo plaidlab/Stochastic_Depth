@@ -138,6 +138,22 @@ function undev()
   for i,block in ipairs(addtables) do model:get(block).dev = false end
 end
 
+function getAlphas()
+  alphas = {}
+  for i,block in ipairs(addtables) do
+    alpha = model:get(block).alpha_learner:get(1).bias[1]
+    alphas[#alphas + 1] = alpha
+  end
+  return alphas
+end
+
+function printAlphas()
+  for i, v in ipairs(getAlphas()) do
+    io.write(v .. ' ')
+  end
+  print()
+end
+
 ---- Testing ----
 function evalModel(dataset)
   model:evaluate()
@@ -174,6 +190,7 @@ function accounting(training_time)
     print(string.format('Epoch %d:\t%.2f%%\t\t%.2f%%\t\t%0.0fs',
       sgdState.epochCounter, results[1]*100, results[2]*100, training_time))
   end
+  printAlphas()
 end
 
 -- TODO: add a function to do a forward pass on the validation set and backprop w.r.t. the alphas

@@ -10,11 +10,11 @@ function ResidualDrop:__init(deathRate, nChannels, nOutChannels, stride)
     self.gradInput = torch.Tensor()
     self.gate = true
     self.train = true
-    
+
     -- DEATH RATE HERE
     -- TODO: replace with alpha. ensure this is a trainable variable, but NOT a parameter of the ResidualDrop or net
     self.deathRate = deathRate
-    
+
     -- TODO: replace the computations where deathRate is used with sigmoid(alpha)
     
     nOutChannels = nOutChannels or nChannels
@@ -43,7 +43,7 @@ function ResidualDrop:__init(deathRate, nChannels, nOutChannels, stride)
     elseif nOutChannels < nChannels then
        print('Do not do this! nOutChannels < nChannels!')
     end
-    
+
     self.modules = {self.net, self.skip}
 end
 

@@ -2,3 +2,6 @@
 cifar.torch
 .DS_Store
 *~
+*results
+
+*.out

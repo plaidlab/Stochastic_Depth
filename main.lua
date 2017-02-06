@@ -30,21 +30,37 @@ opt = lapp[[
   --resultFolder  (default "")          Path to the folder where you'd like to save results
   --dataRoot      (default "")          Path to data (e.g. contains cifar10-train.t7)
 ]]
+
+-- Output selected options
 print(opt)
-cutorch.setDevice(opt.device+1)   -- torch uses 1-based indexing for GPU, so +1
+
+-- Default to the first GPU; torch uses 1-based indexing for GPU, so +1
+cutorch.setDevice(opt.device+1)
+
+-- Set seed for randomization so we can replicate our results
 cutorch.manualSeed(1)
 torch.manualSeed(1)
-torch.setnumthreads(1)            -- number of OpenMP threads, 1 is enough
+
+-- number of OpenMP threads, 1 is enough
+torch.setnumthreads(1)
 
 ---- Loading data ----
+-- Load the relevant dataset object
 if opt.dataset == 'svhn' then require 'svhn-dataset' else require 'cifar-dataset' end
-all_data, all_labels = get_Data(opt.dataset, opt.dataRoot, true)  -- default do shuffling
+
+-- Load all data (train, validate, test) and shuffle
+all_data, all_labels = get_Data(opt.dataset, opt.dataRoot, true)
+
+-- Split up data
 dataTrain = Dataset.LOADER(all_data, all_labels, "train", opt.batchSize, opt.augmentation)
 dataValid = Dataset.LOADER(all_data, all_labels, "valid", opt.batchSize)
 dataTest = Dataset.LOADER(all_data, all_labels, "test", opt.batchSize)
+
+-- Get training data mean and std and normalize validation and test sets
 local mean,std = dataTrain:preprocess()
 dataValid:preprocess(mean,std)
 dataTest:preprocess(mean,std)
+
 print("Training set size:\t",   dataTrain:size())
 print("Validation set size:\t", dataValid:size())
 print("Test set size:\t\t",     dataTest:size())
@@ -66,10 +82,23 @@ lrSchedule = {svhn     = {0.6, 0.7 },
 print('Building model...')
 model = nn.Sequential()
 ------> 3, 32,32
+
+-- Documentation: https://github.com/torch/nn/blob/master/doc/convolution.md#nn.SpatialConvolution
+-- input channels: 3
+-- output channels: 16
+-- kernel: [3, 3]
+-- stride: [1, 1]
+-- padding: [1, 1]
 model:add(cudnn.SpatialConvolution(3, 16, 3,3, 1,1, 1,1)
             :init('weight', nninit.kaiming, {gain = 'relu'})
             :init('bias', nninit.constant, 0))
+
+-- Documentation: https://github.com/torch/nn/blob/master/doc/convolution.md#nn.SpatialBatchNormalization
+-- input channels: 16
 model:add(cudnn.SpatialBatchNormalization(16))
+
+-- Documentation: https://github.com/torch/nn/blob/master/doc/transfer.md#relu
+-- inplace: true
 model:add(cudnn.ReLU(true))
 ------> 16, 32,32   First Group
 for i=1,opt.N do   addResidualDrop(model, nil, 16)   end
