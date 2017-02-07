@@ -3,9 +3,6 @@ require 'cudnn'
 require 'cunn'
 local nninit = require 'nninit'
 
-local AlphaLearner, parent = torch.class('nn.AlphaLearner', 'nn.Container')
-
-
 local ResidualDrop, parent = torch.class('nn.ResidualDrop', 'nn.Container')
 
 function ResidualDrop:__init(init_alpha, nChannels, nOutChannels, stride)
@@ -53,7 +50,7 @@ function ResidualDrop:__init(init_alpha, nChannels, nOutChannels, stride)
        print('Do not do this! nOutChannels < nChannels!')
     end
 
-    self.modules = {self.net, self.skip}
+    self.modules = {self.net, self.skip, self.alpha_learner}
 end
 
 function ResidualDrop:updateOutput(input)
@@ -85,9 +82,17 @@ function ResidualDrop:updateGradInput(input, gradOutput)
    -- Gradient calculations of module outputs w.r.t. module inputs when in dev mode
    -- It's just a weighted version of the normal gradient
    if self.dev then
+
+        -- save the gradOutput to the alpha learner (a scalar dot product)
+        -- dot outputs a scalar but we need gradOutput to be a size 1 Tensor.
+        self.alphaGradOutput = torch.FloatTensor(1):fill(gradOutput:dot(self.net.output)):cuda()
+
         -- y = x + layer_weighting * f(x) so dy/dx = layer_weighting * df(x)/dx
         -- note mul must be with a scalar value contained in a tensor, NOT a tensor
         self.gradInput:add(self.net:updateGradInput(input, gradOutput):mul(self.alpha_learner.output[1]))
+        -- we ALSO need to do this to ensure the nn.sequential that is alpha learner
+        -- propogates its gradients through the modules that make it up
+        self.alpha_learner:updateGradInput(self.init_alpha, self.alphaGradOutput)
 
    -- Gradient calculations of module outputs w.r.t. module inputs when in dev mode
    -- It's just the normal gradient calculation, so call net:updateGradInput
@@ -110,7 +115,17 @@ function ResidualDrop:accGradParameters(input, gradOutput, scale)
    if self.dev then
         -- y = x + g(alpha) * f(x) so given dL / dy, dL / dalpha = (dL / dy) (dg/dalpha * f(x)) = (dL / dy * f(x)) * dg/dalpha
         -- note cmul is elementwise
-       self.alpha_learner:accGradParameters(self.init_alpha, gradOutput:cmul(self.net.output), scale)
+        -- note: changing to dot product
+       self.alpha_learner:accGradParameters(self.init_alpha, self.alphaGradOutput, scale)
+       -- print("gradOutput is: ")
+       -- print(gradOutput)
+       -- print("stored net output is: ")
+       -- print(self.net.output)
+       -- print("thingy to accumulate w.r.t. is: ")
+       -- print(self.alphaGradOutput)
+
+       -- print("alphaLearner bias gradient is: ")
+       -- print(self.alpha_learner:get(1).gradBias[1])
 
    -- Gradient calculations w.r.t. params in train mode and not in dev mode
    -- We avoid training the "alpha_learner" weights by NOT calling alpha_learner:accGradParameters

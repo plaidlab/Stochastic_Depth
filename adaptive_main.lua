@@ -147,11 +147,25 @@ function getAlphas()
   return alphas
 end
 
+function getAlphaGradients()
+  alphas = {}
+  for i,block in ipairs(addtables) do
+    alpha = model:get(block).alpha_learner:get(1).gradBias[1]
+    alphas[#alphas + 1] = alpha
+  end
+  return alphas
+end
+
 function printAlphas()
   for i, v in ipairs(getAlphas()) do
     io.write(v .. ' ')
   end
   print()
+  -- print(" ")
+  -- for i, v in ipairs(getAlphaGradients()) do
+  --  io.write(v .. ' ')
+  -- end
+  -- print()
 end
 
 ---- Testing ----
