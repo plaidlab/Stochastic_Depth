@@ -20,6 +20,8 @@ opt = lapp[[
   --deathRate     (default 0)           1-p_L for lin_decay, 1-p_l for uniform, 0 is constant depth
   --device        (default 0)           Which GPU to run on, 0-based indexing
   --augmentation  (default true)        Standard data augmentation (CIFAR only), true or false
+  --devOnTrain    (default false)       Whether to use train set for dev set. If not, use valid set.
+  --stochastic    (default true)        Whether to use stochastic layers or pure residuals.
   --resultFolder  (default "")          Path to the folder where you'd like to save results
   --dataRoot      (default "")          Path to data (e.g. contains cifar10-train.t7)
 ]]
@@ -130,6 +132,10 @@ function openAllGates()
   for i,block in ipairs(addtables) do model:get(block).gate = true end
 end
 
+function disable_stochastic()
+  for i,block in ipairs(addtables) do model:get(block).no_stochastic = true end
+end
+
 function dev()
   for i,block in ipairs(addtables) do model:get(block).dev = true end
 end
@@ -166,6 +172,10 @@ function printAlphas()
   --  io.write(v .. ' ')
   -- end
   -- print()
+end
+
+if opt.no_stochastic then
+  disable_stochastic()
 end
 
 ---- Testing ----
@@ -222,6 +232,7 @@ function main()
     print('Training...\nEpoch\tValid. err\tTest err\tTraining time')
   end
   local all_indices = torch.range(1, dataTrain:size())
+  local valid_indices = torch.range(1, dataValid:size())
   local timer = torch.Timer()
   while sgdState.epochCounter <= opt.maxEpochs do
     -- Learning rate schedule
@@ -235,6 +246,8 @@ function main()
 
     local shuffle = torch.randperm(dataTrain:size())
     local batches = all_indices:index(1, shuffle:long()):long():split(opt.batchSize)
+    local valid_shuffle = torch.randperm(dataValid:size())
+    local valid_batches = valid_indices:index(1, valid_shuffle:long()):long():split(opt.batchSize)
     for i=1,#batches do
         model:training()
         openAllGates()    -- resets all gates to open
@@ -268,7 +281,12 @@ function main()
         -- will need to test it out.
         function dev_eval(x)
             gradients:zero()
-            local batch = dataTrain:sampleIndices(batches[i])
+            -- get the i'th valid_batch, modulo # valid_batches
+            -- (as # train_batches exceeds #valid_batches)
+            local batch = dataValid:sampleIndices(valid_batches[1 + (i % #valid_batches) ])
+            if opt.devOnTrain then
+              batch = dataTrain:sampleIndices(batches[i])
+            end
             local inputs, labels = batch.inputs, batch.outputs:long()
             inputs = inputs:cuda()
             labels = labels:cuda()

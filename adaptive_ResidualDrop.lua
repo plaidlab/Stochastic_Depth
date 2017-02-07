@@ -11,6 +11,7 @@ function ResidualDrop:__init(init_alpha, nChannels, nOutChannels, stride)
     self.gate = true
     self.train = true
     self.dev = false
+    self.no_stochastic = false
 
     -- init_alpha is a CONSTANT and is not trained
     self.init_alpha = init_alpha
@@ -61,7 +62,7 @@ function ResidualDrop:updateOutput(input)
 
    -- Output calculation when in dev mode
    -- It's just a weighted version of the normal output
-    if self.dev then
+    if self.dev or self.no_stochastic then
       -- note mul must be with a scalar value contained in a tensor, NOT a tensor
       self.output:add(self.net:forward(input):mul(self.alpha_learner:forward(self.init_alpha)[1]))
 
@@ -81,18 +82,22 @@ function ResidualDrop:updateGradInput(input, gradOutput)
 
    -- Gradient calculations of module outputs w.r.t. module inputs when in dev mode
    -- It's just a weighted version of the normal gradient
-   if self.dev then
+   if self.dev or self.no_stochastic then
 
-        -- save the gradOutput to the alpha learner (a scalar dot product)
-        -- dot outputs a scalar but we need gradOutput to be a size 1 Tensor.
-        self.alphaGradOutput = torch.FloatTensor(1):fill(gradOutput:dot(self.net.output)):cuda()
-
-        -- y = x + layer_weighting * f(x) so dy/dx = layer_weighting * df(x)/dx
+        -- say y = layer_weighting * f(x). then given dL/dy, dL/dx = dL/dy * layer_weighting * df(x)/dx
         -- note mul must be with a scalar value contained in a tensor, NOT a tensor
-        self.gradInput:add(self.net:updateGradInput(input, gradOutput):mul(self.alpha_learner.output[1]))
-        -- we ALSO need to do this to ensure the nn.sequential that is alpha learner
-        -- propogates its gradients through the modules that make it up
-        self.alpha_learner:updateGradInput(self.init_alpha, self.alphaGradOutput)
+        self.gradInput:add(self.net:updateGradInput(input, gradOutput:mul(self.alpha_learner.output[1])))
+
+        if self.dev then
+          -- save the gradOutput to the alpha learner (a scalar dot product)
+          -- dot outputs a scalar but we need gradOutput to be a size 1 Tensor.
+          self.alphaGradOutput = torch.FloatTensor(1):fill(gradOutput:dot(self.net.output)):cuda()
+
+          -- we ALSO need to do this to ensure the nn.sequential that is alpha learner
+          -- propogates its gradients through the modules that make it up
+          self.alpha_learner:updateGradInput(self.init_alpha, self.alphaGradOutput)
+
+        end
 
    -- Gradient calculations of module outputs w.r.t. module inputs when in dev mode
    -- It's just the normal gradient calculation, so call net:updateGradInput
@@ -131,9 +136,11 @@ function ResidualDrop:accGradParameters(input, gradOutput, scale)
    -- We avoid training the "alpha_learner" weights by NOT calling alpha_learner:accGradParameters
    -- So no gradients are accumulated for alpha_learner param and sgd will not update it
    elseif self.train then
-       if self.gate then
+       if self.no_stochastic then
+         self.net:accGradParameters(input, gradOutput:mul(self.alpha_learner.output[1]), scale)
+       elseif self.gate then
           -- y = x + f_theta (x) so given dL / dy, dL / dtheta = (dL / dy) (df(x) / dtheta)
-          self.net:accGradParameters(input, gradOutput, scale)
+         self.net:accGradParameters(input, gradOutput, scale)
        end
    end
 end
