@@ -21,7 +21,7 @@ function ResidualDrop:__init(init_alpha, nChannels, nOutChannels, stride)
     -- training the bias is equivalent to training alpha
 
     self.alpha_learner = nn.Sequential()
-    self.alpha_learner:add(nn.Add(1))
+    self.alpha_learner:add(nn.Add(1):init('bias', nninit.constant, self.init_alpha))
     self.alpha_learner:add(nn.Sigmoid())
 
     nOutChannels = nOutChannels or nChannels
@@ -64,7 +64,7 @@ function ResidualDrop:updateOutput(input)
    -- It's just a weighted version of the normal output
     if self.dev or self.no_stochastic then
       -- note mul must be with a scalar value contained in a tensor, NOT a tensor
-      self.output:add(self.net:forward(input):mul(self.alpha_learner:forward(self.init_alpha)[1]))
+      self.output:add(self.net:forward(input):mul(self.alpha_learner:forward(torch.FloatTensor(1):zero():cuda())[1]))
 
     -- Output calculation when in train mode
     -- Add net:forward if gate is open

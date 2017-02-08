@@ -117,11 +117,11 @@ for i,block in ipairs(addtables) do
     local init_alpha = torch.log(1 - opt.deathRate)
 
     -- block.init_alpha must be a Tensor (as used as input to a Module) but is only size 1
-    model:get(block).init_alpha = torch.FloatTensor(1):zero():fill(init_alpha):cuda()
+    model:get(block).init_alpha = init_alpha
 
   elseif opt.deathMode == 'lin_decay' then
     local init_alpha = torch.log(1 - (i / #addtables * opt.deathRate))
-    model:get(block).init_alpha = torch.FloatTensor(1):zero():fill(init_alpha):cuda()
+    model:get(block).init_alpha = init_alpha
   else
     print('Invalid argument for deathMode!')
   end
