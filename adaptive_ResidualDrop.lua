@@ -146,8 +146,18 @@ function ResidualDrop:accGradParameters(input, gradOutput, scale)
 end
 
 ---- Adds a residual block to the passed in model ----
-function addResidualDrop(model, init_alpha, nChannels, nOutChannels, stride)
-   model:add(nn.ResidualDrop(init_alpha, nChannels, nOutChannels, stride))
-   model:add(cudnn.ReLU(true))
-   return model
+function addResidualDrop(model, opt, nChannels, nOutChannels, stride)
+
+    if opt.deathMode == 'uniform' then
+      init_alpha = torch.log(1 - opt.deathRate)
+    elseif opt.deathMode == 'lin_decay' then
+      init_alpha = torch.log(1 - (model.num_blocks / (opt.N * 3) * opt.deathRate))
+    else
+      print('Invalid argument for deathMode!')
+    end
+
+  model:add(nn.ResidualDrop(init_alpha, nChannels, nOutChannels, stride))
+  model:add(cudnn.ReLU(true))
+  model.num_blocks = model.num_blocks + 1
+  return model
 end

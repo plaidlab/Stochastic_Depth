@@ -20,10 +20,13 @@ opt = lapp[[
   --deathRate     (default 0)           1-p_L for lin_decay, 1-p_l for uniform, 0 is constant depth
   --device        (default 0)           Which GPU to run on, 0-based indexing
   --augmentation  (default true)        Standard data augmentation (CIFAR only), true or false
+  --trainAlphas   (default true)        Whether tot rain the alphas at all
   --devOnTrain    (default false)       Whether to use train set for dev set. If not, use valid set.
   --stochastic    (default true)        Whether to use stochastic layers or pure residuals.
   --resultFolder  (default "")          Path to the folder where you'd like to save results
   --dataRoot      (default "")          Path to data (e.g. contains cifar10-train.t7)
+  --trsize        (default 45000)       Size of training data set
+  --vasize        (default 5000)        Size of validation data set
 ]]
 print(opt)
 cutorch.setDevice(opt.device+1)   -- torch uses 1-based indexing for GPU, so +1
@@ -34,9 +37,9 @@ torch.setnumthreads(1)            -- number of OpenMP threads, 1 is enough
 ---- Loading data ----
 if opt.dataset == 'svhn' then require 'svhn-dataset' else require 'cifar-dataset' end
 all_data, all_labels = get_Data(opt.dataset, opt.dataRoot, true)  -- default do shuffling
-dataTrain = Dataset.LOADER(all_data, all_labels, "train", opt.batchSize, opt.augmentation)
-dataValid = Dataset.LOADER(all_data, all_labels, "valid", opt.batchSize)
-dataTest = Dataset.LOADER(all_data, all_labels, "test", opt.batchSize)
+dataTrain = Dataset.LOADER(all_data, all_labels, "train", opt)
+dataValid = Dataset.LOADER(all_data, all_labels, "valid", opt)
+dataTest = Dataset.LOADER(all_data, all_labels, "test", opt)
 local mean,std = dataTrain:preprocess()
 dataValid:preprocess(mean,std)
 dataTest:preprocess(mean,std)
@@ -68,6 +71,7 @@ lrSchedule = {svhn     = {0.6, 0.7 },
 -- Input: 3x32x32
 print('Building model...')
 model = nn.Sequential()
+model.num_blocks = 0
 ------> 3, 32,32
 model:add(cudnn.SpatialConvolution(3, 16, 3,3, 1,1, 1,1)
             :init('weight', nninit.kaiming, {gain = 'relu'})
@@ -75,13 +79,13 @@ model:add(cudnn.SpatialConvolution(3, 16, 3,3, 1,1, 1,1)
 model:add(cudnn.SpatialBatchNormalization(16))
 model:add(cudnn.ReLU(true))
 ------> 16, 32,32   First Group
-for i=1,opt.N do   addResidualDrop(model, nil, 16)   end
+for i=1,opt.N do   addResidualDrop(model, opt, 16)   end
 ------> 32, 16,16   Second Group
-addResidualDrop(model, nil, 16, 32, 2)
-for i=1,opt.N-1 do   addResidualDrop(model, nil, 32)   end
+addResidualDrop(model, opt, 16, 32, 2)
+for i=1,opt.N-1 do   addResidualDrop(model, opt, 32)   end
 ------> 64, 8,8     Third Group
-addResidualDrop(model, nil, 32, 64, 2)
-for i=1,opt.N-1 do   addResidualDrop(model, nil, 64)   end
+addResidualDrop(model, opt, 32, 64, 2)
+for i=1,opt.N-1 do   addResidualDrop(model, opt, 64)   end
 ------> 10, 8,8     Pooling, Linear, Softmax
 model:add(nn.SpatialAveragePooling(8,8)):add(nn.Reshape(64))
 if opt.dataset == 'cifar10' or opt.dataset == 'svhn' then
@@ -106,26 +110,6 @@ for i=1,model:size() do
 end
 
 ---- Sets the deathRate (1 - survival probability) for all residual blocks  ----
-
--- TODO: replace death rates with 'alphas', which should be trainable variables, and add them to some list
-for i,block in ipairs(addtables) do
-  if opt.deathMode == 'uniform' then
-    -- for convenience, have set alpha to log of 1 - drop_probability
-    -- this lets us think of alpha as proportional to keep_prob, per paper and discussions
-
-    -- here we set init_alpha according to their schedule
-    local init_alpha = torch.log(1 - opt.deathRate)
-
-    -- block.init_alpha must be a Tensor (as used as input to a Module) but is only size 1
-    model:get(block).init_alpha = init_alpha
-
-  elseif opt.deathMode == 'lin_decay' then
-    local init_alpha = torch.log(1 - (i / #addtables * opt.deathRate))
-    model:get(block).init_alpha = init_alpha
-  else
-    print('Invalid argument for deathMode!')
-  end
-end
 
 ---- Resets all gates to open ----
 function openAllGates()
@@ -153,6 +137,15 @@ function getAlphas()
   return alphas
 end
 
+function getDropProbs()
+  probs = {}
+  for i,block in ipairs(addtables) do
+    prob = model:get(block).alpha_learner:forward(torch.FloatTensor(1):zero():cuda())[1]
+    probs[#probs + 1] = prob
+  end
+  return probs
+end
+
 function getAlphaGradients()
   alphas = {}
   for i,block in ipairs(addtables) do
@@ -164,6 +157,18 @@ end
 
 function printAlphas()
   for i, v in ipairs(getAlphas()) do
+    io.write(v .. ' ')
+  end
+  print()
+  -- print(" ")
+  -- for i, v in ipairs(getAlphaGradients()) do
+  --  io.write(v .. ' ')
+  -- end
+  -- print()
+end
+
+function printDropProbs()
+  for i, v in ipairs(getDropProbs()) do
     io.write(v .. ' ')
   end
   print()
@@ -214,7 +219,7 @@ function accounting(training_time)
     print(string.format('Epoch %d:\t%.2f%%\t\t%.2f%%\t\t%0.0fs',
       sgdState.epochCounter, results[1]*100, results[2]*100, training_time))
   end
-  printAlphas()
+  printDropProbs()
 end
 
 -- TODO: add a function to do a forward pass on the validation set and backprop w.r.t. the alphas
@@ -253,7 +258,7 @@ function main()
         openAllGates()    -- resets all gates to open
         -- Randomly determines the gates to close, according to their survival probabilities
         for i,tb in ipairs(addtables) do
-          if torch.rand(1):cuda()[1] < model:get(tb).alpha_learner:forward(model:get(tb).init_alpha)[1] then model:get(tb).gate = false end
+          if torch.rand(1):cuda()[1] < model:get(tb).alpha_learner:forward(torch.FloatTensor(1):zero():cuda())[1] then model:get(tb).gate = false end
         end
 
         function train_eval(x)
@@ -275,30 +280,33 @@ function main()
 
         -- now open gates, set dev mode
         openAllGates()
-        dev()
 
-        -- i have no idea if we really need to redefine this fn or could use train_eval from before.
-        -- will need to test it out.
-        function dev_eval(x)
-            gradients:zero()
-            -- get the i'th valid_batch, modulo # valid_batches
-            -- (as # train_batches exceeds #valid_batches)
-            local batch = dataValid:sampleIndices(valid_batches[1 + (i % #valid_batches) ])
-            if opt.devOnTrain then
-              batch = dataTrain:sampleIndices(batches[i])
-            end
-            local inputs, labels = batch.inputs, batch.outputs:long()
-            inputs = inputs:cuda()
-            labels = labels:cuda()
-            local y = model:forward(inputs)
-            local loss_val = loss:forward(y, labels)
-            local dl_df = loss:backward(y, labels)
-            model:backward(inputs, dl_df)
-            return loss_val, gradients
+        if opt.trainAlphas then
+          dev()
+
+          -- i have no idea if we really need to redefine this fn or could use train_eval from before.
+          -- will need to test it out.
+          function dev_eval(x)
+              gradients:zero()
+              -- get the i'th valid_batch, modulo # valid_batches
+              -- (as # train_batches exceeds #valid_batches)
+              local batch = dataValid:sampleIndices(valid_batches[1 + (i % #valid_batches) ])
+              if opt.devOnTrain then
+                batch = dataTrain:sampleIndices(batches[i])
+              end
+              local inputs, labels = batch.inputs, batch.outputs:long()
+              inputs = inputs:cuda()
+              labels = labels:cuda()
+              local y = model:forward(inputs)
+              local loss_val = loss:forward(y, labels)
+              local dl_df = loss:backward(y, labels)
+              model:backward(inputs, dl_df)
+              return loss_val, gradients
+          end
+
+          -- now do step of sgd against alphas. by setting dev mode we fix net parameters.
+          optim.sgd(dev_eval, weights, dev_sgdState)
         end
-
-        -- now do step of sgd against alphas. by setting dev mode we fix net parameters.
-        optim.sgd(dev_eval, weights, dev_sgdState)
 
         if opt.dataset == 'svhn' then
           if sgdState.iterCounter % 200 == 0 then

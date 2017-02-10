@@ -25,22 +25,29 @@ function get_Data(dataset, path, do_shuffling)
    return data, label + 1
 end
 
-function CIFAR:__init(data, label, mode, batchSize, augmentation)
-   local trsize = 45000
-   local vasize = 5000
+function CIFAR:__init(data, label, mode, opt)
+  local max_trainvalid = 50000
+
+  local trsize = opt.trsize
+  local vasize = opt.vasize
    local tesize = 10000
-   self.batchSize = batchSize
+
+   if trsize + vasize > max_trainvalid then
+     print('Too large train + validation! Not enough data left for test')
+   end
+
+   self.batchSize = opt.batchSize
    self.mode = mode
    if mode == "train" then
       self.data = data[{ {1,trsize} }]
       self.label = label[{ {1,trsize} }]
-      self.augmentation = augmentation
+      self.augmentation = opt.augmentation
    elseif mode == "valid" then
       self.data = data[{ {trsize+1, trsize+vasize} }]
       self.label = label[{ {trsize+1, trsize+vasize} }]
    elseif mode == "test" then
-      self.data = data[{ {trsize+vasize+1, trsize+vasize+tesize} }]
-      self.label = label[{ {trsize+vasize+1, trsize+vasize+tesize} }]
+      self.data = data[{ {max_trainvalid+1, max_trainvalid+tesize} }]
+      self.label = label[{ {max_trainvalid+1, max_trainvalid+tesize} }]
    end
 end
 
