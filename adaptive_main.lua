@@ -35,6 +35,12 @@ cutorch.manualSeed(1)
 torch.manualSeed(1)
 torch.setnumthreads(1)            -- number of OpenMP threads, 1 is enough
 
+opt.resultFolder = string.format('results_tr%d_va%d', opt.trsize, opt.vasize)
+os.execute('mkdir -p ' .. opt.resultFolder)
+f_err = assert(io.open(string.format('%s/err.out', opt.resultFolder), 'w'))
+f_drop = assert(io.open(string.format('%s/drop.out', opt.resultFolder), 'w'))
+f_alpha = assert(io.open(string.format('%s/alpha.out', opt.resultFolder), 'w'))
+
 ---- Loading data ----
 if opt.dataset == 'svhn' then require 'svhn-dataset' else require 'cifar-dataset' end
 all_data, all_labels = get_Data(opt.dataset, opt.dataRoot, true)  -- default do shuffling
@@ -159,25 +165,23 @@ end
 function printAlphas()
   for i, v in ipairs(getAlphas()) do
     io.write(v .. ' ')
+    f_alpha:write(v .. ' ')
+    f_alpha:flush()
   end
-  print()
-  -- print(" ")
-  -- for i, v in ipairs(getAlphaGradients()) do
-  --  io.write(v .. ' ')
-  -- end
-  -- print()
+  io.write('\n')
+  f_alpha:write('\n')
+  f_alpha:flush()
 end
 
 function printDropProbs()
   for i, v in ipairs(getDropProbs()) do
     io.write(v .. ' ')
+    f_drop:write(v .. ' ')
+    f_drop:flush()
   end
-  print()
-  -- print(" ")
-  -- for i, v in ipairs(getAlphaGradients()) do
-  --  io.write(v .. ' ')
-  -- end
-  -- print()
+  io.write('\n')
+  f_drop:write('\n')
+  f_drop:flush()
 end
 
 if opt.no_stochastic then
@@ -214,11 +218,17 @@ function accounting(training_time)
   torch.save(opt.resultFolder .. string.format('errors_%d_%s_%s_%.1f',
     opt.N, opt.dataset, opt.deathMode, opt.deathRate), all_results)
   if opt.dataset == 'svhn' then
-    print(string.format('Iter %d:\t%.2f%%\t\t%.2f%%\t\t%0.0fs',
-      sgdState.iterCounter, results[1]*100, results[2]*100, training_time))
+    out = string.format('Iter %d:\t%.2f%%\t\t%.2f%%\t\t%0.0fs',
+      sgdState.iterCounter, results[1]*100, results[2]*100, training_time)
+    print(out)
+    f_err:write(out .. '\n')
+    f_err:flush()
   else
-    print(string.format('Epoch %d:\t%.2f%%\t\t%.2f%%\t\t%0.0fs',
-      sgdState.epochCounter, results[1]*100, results[2]*100, training_time))
+    out = string.format('Epoch %d:\t%.2f%%\t\t%.2f%%\t\t%0.0fs',
+      sgdState.epochCounter, results[1]*100, results[2]*100, training_time)
+    print(out)
+    f_err:write(out .. '\n')
+    f_err:flush()
   end
   printDropProbs()
 end
