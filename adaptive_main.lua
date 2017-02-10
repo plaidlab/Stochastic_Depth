@@ -20,7 +20,8 @@ opt = lapp[[
   --deathRate     (default 0)           1-p_L for lin_decay, 1-p_l for uniform, 0 is constant depth
   --device        (default 0)           Which GPU to run on, 0-based indexing
   --augmentation  (default true)        Standard data augmentation (CIFAR only), true or false
-  --trainAlphas   (default true)        Whether tot rain the alphas at all
+  --trainAlphas   (default true)        Whether to train the alphas at all
+  --alphaLR       (default 1)           Learning rate for alphas
   --devOnTrain    (default false)       Whether to use train set for dev set. If not, use valid set.
   --stochastic    (default true)        Whether to use stochastic layers or pure residuals.
   --resultFolder  (default "")          Path to the folder where you'd like to save results
@@ -56,7 +57,7 @@ sgdState = {
 }
 
 dev_sgdState = {
-   weightDecay   = 1e-4,
+   weightDecay   = 0.0,
    momentum      = 0.0,
    dampening     = 0,
    nesterov      = false,
@@ -243,10 +244,13 @@ function main()
     -- Learning rate schedule
     if sgdState.epochCounter < opt.maxEpochs*lrSchedule[opt.dataset][1] then
       sgdState.learningRate = 0.1
+      dev_sgdState.learningRate = opt.alphaLR
     elseif sgdState.epochCounter < opt.maxEpochs*lrSchedule[opt.dataset][2] then
       sgdState.learningRate = 0.01
+      dev_sgdState.learningRate = opt.alphaLR * 0.1
     else
       sgdState.learningRate = 0.001
+      dev_sgdState.learningRate = opt.alphaLR * 0.01
     end
 
     local shuffle = torch.randperm(dataTrain:size())
