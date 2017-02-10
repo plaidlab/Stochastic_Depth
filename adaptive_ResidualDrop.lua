@@ -149,13 +149,21 @@ end
 function addResidualDrop(model, opt, nChannels, nOutChannels, stride)
 
     if opt.deathMode == 'uniform' then
-      init_alpha = torch.log(1 - opt.deathRate)
+      intermediate = 1 - opt.deathRate - 1e-8
+      init_alpha = torch.log(intermediate / (1 - intermediate))
     elseif opt.deathMode == 'lin_decay' then
-      init_alpha = torch.log(1 - (model.num_blocks / (opt.N * 3) * opt.deathRate))
+      intermediate = 1 - (model.num_blocks / (opt.N * 3 - 1) * opt.deathRate) - 1e-8
+      init_alpha = torch.log(intermediate / (1 - intermediate))
     else
       print('Invalid argument for deathMode!')
     end
 
+  -- print(opt.deathMode)
+  -- print(opt.deathRate)
+  -- print(model.num_blocks)
+  -- print(opt.N * 3)
+  -- print(init_alpha)
+  -- print(torch.sigmoid(init_alpha))
   model:add(nn.ResidualDrop(init_alpha, nChannels, nOutChannels, stride))
   model:add(cudnn.ReLU(true))
   model.num_blocks = model.num_blocks + 1
