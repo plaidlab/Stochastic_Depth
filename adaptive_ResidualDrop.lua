@@ -54,6 +54,15 @@ function ResidualDrop:__init(init_alpha, nChannels, nOutChannels, stride)
     self.modules = {self.net, self.skip, self.alpha_learner}
 end
 
+function ResidualDrop:parameters()
+  if self.dev then
+    return self.alpha_learner:parameters()
+  else
+    return self.net:parameters()
+  end
+end
+
+
 function ResidualDrop:updateOutput(input)
 
    -- Start by adding residual to output
@@ -136,12 +145,17 @@ function ResidualDrop:accGradParameters(input, gradOutput, scale)
    -- We avoid training the "alpha_learner" weights by NOT calling alpha_learner:accGradParameters
    -- So no gradients are accumulated for alpha_learner param and sgd will not update it
    elseif self.train then
+
+
        if self.no_stochastic then
          self.net:accGradParameters(input, gradOutput:mul(self.alpha_learner.output[1]), scale)
+
        elseif self.gate then
           -- y = x + f_theta (x) so given dL / dy, dL / dtheta = (dL / dy) (df(x) / dtheta)
          self.net:accGradParameters(input, gradOutput, scale)
        end
+
+       -- print(self.alpha_learner:get(1).gradBias[1])
    end
 end
 
