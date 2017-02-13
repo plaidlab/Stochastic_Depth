@@ -296,7 +296,7 @@ function main()
         openAllGates()    -- resets all gates to open
         -- Randomly determines the gates to close, according to their survival probabilities
         for i,tb in ipairs(addtables) do
-          if torch.rand(1):cuda()[1] < model:get(tb).alpha_learner:forward(model:get(block).zero)[1] then
+          if torch.rand(1):cuda()[1] < model:get(tb).alpha_learner:forward(model:get(tb).zero)[1] then
             model:get(tb).gate = false
           end
         end
