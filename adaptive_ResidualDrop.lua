@@ -71,7 +71,7 @@ function ResidualDrop:updateOutput(input)
 
    -- Output calculation when in dev mode
    -- It's just a weighted version of the normal output
-    if self.dev or self.no_stochastic then
+    if self.dev or self.no_stochastic or not self.train then
       -- note mul must be with a scalar value contained in a tensor, NOT a tensor
       self.output:add(self.net:forward(input):mul(self.alpha_learner:forward(torch.FloatTensor(1):zero():cuda())[1]))
 
