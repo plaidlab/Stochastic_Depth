@@ -146,6 +146,15 @@ function getAlphas()
   return alphas
 end
 
+function getBiases()
+  biases = {}
+  for i,block in ipairs(addtables) do
+    bias = model:get(block).net:get(1).bias[1]
+    biases[#biases + 1] = bias
+  end
+  return biases
+end
+
 function getDropProbs()
   probs = {}
   for i,block in ipairs(addtables) do
@@ -186,6 +195,17 @@ function printAlphaGradients()
   f_alpha:flush()
 end
 
+function printBiases()
+  for i, v in ipairs(getBiases()) do
+    io.write(v .. ' ')
+    f_alpha:write(v .. ' ')
+    f_alpha:flush()
+  end
+  io.write('\n')
+  f_alpha:write('\n')
+  f_alpha:flush()
+end
+
 function printDropProbs()
   for i, v in ipairs(getDropProbs()) do
     io.write(v .. ' ')
@@ -204,7 +224,6 @@ end
 ---- Testing ----
 function evalModel(dataset)
   model:evaluate()
-  dev()
   openAllGates() -- this is actually redundant, test mode never skips any layer
   local correct = 0
   local total = 0
@@ -246,6 +265,8 @@ function accounting(training_time, train_accuracy)
   end
   printDropProbs()
   printAlphaGradients()
+  print('Printing biases')
+  printBiases()
 end
 
 -- TODO: add a function to do a forward pass on the validation set and backprop w.r.t. the alphas
@@ -296,7 +317,7 @@ function main()
         openAllGates()    -- resets all gates to open
         -- Randomly determines the gates to close, according to their survival probabilities
         for i,tb in ipairs(addtables) do
-          if torch.rand(1):cuda()[1] < model:get(tb).alpha_learner:forward(model:get(tb).zero)[1] then
+          if torch.rand(1):cuda()[1] > model:get(tb).alpha_learner:forward(model:get(tb).zero)[1] then
             model:get(tb).gate = false
           end
         end
@@ -319,6 +340,8 @@ function main()
             local top1 = indices:select(2, 1)
             correct = correct + torch.eq(top1, long_labels):sum()
             total = total + indices:size(1)
+
+            -- print(torch.sum(gradients))
 
             return loss_val, gradients
         end

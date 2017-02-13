@@ -56,6 +56,7 @@ function ResidualDrop:__init(init_alpha, nChannels, nOutChannels, stride)
     self.modules = {self.net, self.skip, self.alpha_learner}
 end
 
+
 function ResidualDrop:parameters()
   if self.dev then
     return self.alpha_learner:parameters()
@@ -73,9 +74,16 @@ function ResidualDrop:updateOutput(input)
 
    -- Output calculation when in dev mode
    -- It's just a weighted version of the normal output
-    if self.dev or self.no_stochastic or (self.train == false) then
+    if self.dev or self.no_stochastic or not self.train then
+      -- print('Layer active in non-train!')
       -- note mul must be with a scalar value contained in a tensor, NOT a tensor
       self.output:add(self.net:forward(input):mul(self.alpha_learner:forward(self.zero)[1]))
+
+      --
+      -- print(string.format('AL forward is %.2f', self.alpha_learner:forward(self.zero)[1]))
+      -- print(string.format('Sigmoid of init alpha is %.2f', torch.sigmoid(init_alpha)))
+      -- print(string.format('Sigmoid of self.init alpha is %.2f', torch.sigmoid(self.init_alpha)))
+
 
     -- Output calculation when in train mode
     -- Add net:forward if gate is open
@@ -164,15 +172,15 @@ end
 ---- Adds a residual block to the passed in model ----
 function addResidualDrop(model, opt, nChannels, nOutChannels, stride)
 
-    if opt.deathMode == 'uniform' then
-      intermediate = 1 - opt.deathRate - 1e-8
-      init_alpha = torch.log(intermediate / (1 - intermediate))
-    elseif opt.deathMode == 'lin_decay' then
-      intermediate = 1 - (model.num_blocks / (opt.N * 3 - 1) * opt.deathRate) - 1e-8
-      init_alpha = torch.log(intermediate / (1 - intermediate))
-    else
-      print('Invalid argument for deathMode!')
-    end
+    -- if opt.deathMode == 'uniform' then
+    --   intermediate = 1 - opt.deathRate - 1e-8
+    --   init_alpha = torch.log(intermediate / (1 - intermediate))
+    -- elseif opt.deathMode == 'lin_decay' then
+    local intermediate = 1 - (model.num_blocks / (opt.N * 3 - 1) * opt.deathRate) - 1e-8
+    local init_alpha = torch.log(intermediate / (1 - intermediate))
+    -- else
+      -- print('Invalid argument for deathMode!')
+    -- end
 
   -- print(opt.deathMode)
   -- print(opt.deathRate)
