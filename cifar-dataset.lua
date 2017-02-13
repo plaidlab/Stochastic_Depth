@@ -42,12 +42,15 @@ function CIFAR:__init(data, label, mode, opt)
       self.data = data[{ {1,trsize} }]
       self.label = label[{ {1,trsize} }]
       self.augmentation = opt.augmentation
+      print(string.format('Train data: %d to %d', 1, trsize))
    elseif mode == "valid" then
       self.data = data[{ {trsize+1, trsize+vasize} }]
       self.label = label[{ {trsize+1, trsize+vasize} }]
+      print(string.format('Validation data: %d to %d', trsize+1, trsize+vasize))
    elseif mode == "test" then
       self.data = data[{ {max_trainvalid+1, max_trainvalid+tesize} }]
       self.label = label[{ {max_trainvalid+1, max_trainvalid+tesize} }]
+      print(string.format('Test data: %d to %d', max_trainvalid+1, max_trainvalid + tesize))
    end
 end
 
