@@ -149,7 +149,7 @@ end
 function getDropProbs()
   probs = {}
   for i,block in ipairs(addtables) do
-    prob = model:get(block).alpha_learner:forward(torch.FloatTensor(1):zero():cuda())[1]
+    prob = model:get(block).alpha_learner:forward(model:get(block).zero)[1]
     probs[#probs + 1] = prob
   end
   return probs
@@ -204,6 +204,7 @@ end
 ---- Testing ----
 function evalModel(dataset)
   model:evaluate()
+  dev()
   openAllGates() -- this is actually redundant, test mode never skips any layer
   local correct = 0
   local total = 0
@@ -295,7 +296,9 @@ function main()
         openAllGates()    -- resets all gates to open
         -- Randomly determines the gates to close, according to their survival probabilities
         for i,tb in ipairs(addtables) do
-          if torch.rand(1):cuda()[1] < model:get(tb).alpha_learner:forward(torch.FloatTensor(1):zero():cuda())[1] then model:get(tb).gate = false end
+          if torch.rand(1):cuda()[1] < model:get(tb).alpha_learner:forward(model:get(block).zero)[1] then
+            model:get(tb).gate = false
+          end
         end
 
         undev()

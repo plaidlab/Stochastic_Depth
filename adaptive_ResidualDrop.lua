@@ -13,6 +13,8 @@ function ResidualDrop:__init(init_alpha, nChannels, nOutChannels, stride)
     self.dev = false
     self.no_stochastic = false
 
+    self.zero = torch.FloatTensor(1):zero():cuda()
+
     -- init_alpha is a CONSTANT and is not trained
     self.init_alpha = init_alpha
 
@@ -71,9 +73,9 @@ function ResidualDrop:updateOutput(input)
 
    -- Output calculation when in dev mode
    -- It's just a weighted version of the normal output
-    if self.dev or self.no_stochastic or not self.train then
+    if self.dev or self.no_stochastic or (self.train == false) then
       -- note mul must be with a scalar value contained in a tensor, NOT a tensor
-      self.output:add(self.net:forward(input):mul(self.alpha_learner:forward(torch.FloatTensor(1):zero():cuda())[1]))
+      self.output:add(self.net:forward(input):mul(self.alpha_learner:forward(self.zero)[1]))
 
     -- Output calculation when in train mode
     -- Add net:forward if gate is open
