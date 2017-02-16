@@ -306,7 +306,7 @@ function main()
     elseif sgdState.epochCounter < opt.maxEpochs*lrSchedule[opt.dataset][2] then
       sgdState.learningRate = 0.1 * opt.baseLR
       dev_sgdState.learningRate = opt.alphaLR * 0.1
-    elseif sgdState.epochCounter < opt.maxEpochs
+    elseif sgdState.epochCounter < opt.maxEpochs then
       sgdState.learningRate = 0.01 * opt.baseLR
       dev_sgdState.learningRate = opt.alphaLR * 0.01
     else
