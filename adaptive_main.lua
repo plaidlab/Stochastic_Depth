@@ -29,6 +29,7 @@ opt = lapp[[
   --dataRoot      (default "")          Path to data (e.g. contains cifar10-train.t7)
   --trsize        (default 45000)       Size of training data set
   --vasize        (default 5000)        Size of validation data set
+  --trainPerDev   (default 1)           Number of training steps per dev step
   --baseLR        (default 0.1)         Base learning rate for parameters
 ]]
 print(opt)
@@ -263,10 +264,10 @@ function accounting(training_time, train_accuracy)
     f_err:write(out .. '\n')
     f_err:flush()
   end
-  printDropProbs()
-  printAlphaGradients()
-  print('Printing biases')
-  printBiases()
+  -- printDropProbs()
+  -- printAlphaGradients()
+  -- print('Printing biases')
+  -- printBiases()
 end
 
 -- TODO: add a function to do a forward pass on the validation set and backprop w.r.t. the alphas
@@ -291,7 +292,13 @@ function main()
   local all_indices = torch.range(1, dataTrain:size())
   local valid_indices = torch.range(1, dataValid:size())
   local timer = torch.Timer()
-  while sgdState.epochCounter <= opt.maxEpochs do
+  if opt.trainAlphas then
+    additional_epochs = 100
+  else
+    additional_epochs = 0
+  end
+
+  while sgdState.epochCounter <= opt.maxEpochs + additional_epochs do
     -- Learning rate schedule
     if sgdState.epochCounter < opt.maxEpochs*lrSchedule[opt.dataset][1] then
       sgdState.learningRate = opt.baseLR
@@ -299,9 +306,12 @@ function main()
     elseif sgdState.epochCounter < opt.maxEpochs*lrSchedule[opt.dataset][2] then
       sgdState.learningRate = 0.1 * opt.baseLR
       dev_sgdState.learningRate = opt.alphaLR * 0.1
-    else
+    elseif sgdState.epochCounter < opt.maxEpochs
       sgdState.learningRate = 0.01 * opt.baseLR
       dev_sgdState.learningRate = opt.alphaLR * 0.01
+    else
+      sgdState.learningRate = 0.01 * opt.baseLR * (torch.sqrt((sgdState.epochCounter - opt.maxEpochs)/100))
+      dev_sgdState.learningRate = 0
     end
 
     local shuffle = torch.randperm(dataTrain:size())
@@ -354,7 +364,7 @@ function main()
         -- now open gates, set dev mode
         openAllGates()
 
-        if opt.trainAlphas and sgdState.epochCounter >= opt.warmStartEpochs then
+        if (i % opt.trainPerDev == 0) and opt.trainAlphas and sgdState.epochCounter >= opt.warmStartEpochs then
           dev()
 
           -- i have no idea if we really need to redefine this fn or could use train_eval from before.
@@ -395,9 +405,9 @@ function main()
     end
     sgdState.epochCounter = sgdState.epochCounter + 1
   end
+
   -- Saves the the last model, optional. Model loading feature is not available now but is easy to add
-  -- torch.save(opt.resultFolder .. string.format('model_%d_%s_%s_%.1f',
-  --    opt.N, opt.dataset, opt.deathMode, opt.deathRate), model)
+   torch.save(opt.resultFolder .. string.format('model_%d_%s_%s_%.1f', opt.N, opt.dataset, opt.deathMode, opt.deathRate), model)
 end
 
 main()

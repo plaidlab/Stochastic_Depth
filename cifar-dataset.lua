@@ -17,19 +17,20 @@ function get_Data(dataset, path, do_shuffling)
    label[{ {50001, 60000} }] = test_data.label
 
    if do_shuffling then
-      local shuffle = torch.randperm(50000)
+      local gen = torch.Generator()
+      torch.manualSeed(gen, 777)
+      local shuffle = torch.randperm(gen, 50000)
       data[{ {1, 50000} }] = data:index(1, shuffle:long())
       label[{ {1, 50000} }] = label:index(1, shuffle:long())
    end
-   -- raw labels were 0-based indexing, convert to 1-based
    return data, label + 1
 end
 
 function CIFAR:__init(data, label, mode, opt)
-  local max_trainvalid = 50000
+   local max_trainvalid = 50000
 
-  local trsize = opt.trsize
-  local vasize = opt.vasize
+   local trsize = opt.trsize
+   local vasize = opt.vasize
    local tesize = 10000
 
    if trsize + vasize > max_trainvalid then
