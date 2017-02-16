@@ -249,7 +249,7 @@ function accounting(training_time, train_accuracy)
   local results = {train_accuracy, evalModel(dataValid), evalModel(dataTest)}
   all_results[#all_results + 1] = results
   -- Saves the errors. These get covered up by new ones every time the function is called
-  torch.save(opt.resultFolder .. string.format('errors_%d_%s_%s_%.1f',
+  torch.save(opt.resultFolder .. '/' .. string.format('errors_%d_%s_%s_%.1f',
     opt.N, opt.dataset, opt.deathMode, opt.deathRate), all_results)
   if opt.dataset == 'svhn' then
     out = string.format('Iter %d:\t%.2f%%\t\t%.2f%%\t\t%.2f%%\t\t%0.0fs',
@@ -403,11 +403,17 @@ function main()
       accounting(timer:time().real, train_accuracy)
       timer:reset()
     end
+
+    -- periodic model saving
+    if sgdState.epochCounter % 1000 == 0 then
+      torch.save(opt.resultFolder .. '/' .. string.format('model_%d_%s_%s_%.1f_%d', opt.N, opt.dataset, opt.deathMode, opt.deathRate, sgdState.epochCounter), model)
+    end
+
     sgdState.epochCounter = sgdState.epochCounter + 1
   end
 
   -- Saves the the last model, optional. Model loading feature is not available now but is easy to add
-   torch.save(opt.resultFolder .. string.format('model_%d_%s_%s_%.1f', opt.N, opt.dataset, opt.deathMode, opt.deathRate), model)
+   torch.save(opt.resultFolder .. '/' .. string.format('last_model_%d_%s_%s_%.1f_%d', opt.N, opt.dataset, opt.deathMode, opt.deathRate, sgdState.epochCounter-1), model)
 end
 
 main()
