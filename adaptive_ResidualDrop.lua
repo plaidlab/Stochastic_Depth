@@ -172,15 +172,15 @@ end
 ---- Adds a residual block to the passed in model ----
 function addResidualDrop(model, opt, nChannels, nOutChannels, stride)
 
-    -- if opt.deathMode == 'uniform' then
-    --   intermediate = 1 - opt.deathRate - 1e-8
-    --   init_alpha = torch.log(intermediate / (1 - intermediate))
-    -- elseif opt.deathMode == 'lin_decay' then
-    local intermediate = 1 - (model.num_blocks / (opt.N * 3 - 1) * opt.deathRate) - 1e-8
+    if opt.deathMode == 'uniform' then
+      intermediate = 1 - opt.deathRate - 1e-8
+    elseif opt.deathMode == 'lin_decay' then
+      intermediate = 1 - (model.num_blocks / (opt.N * 3 - 1) * opt.deathRate) - 1e-8
+    else
+      print('Invalid argument for deathMode!')
+    end
+
     local init_alpha = torch.log(intermediate / (1 - intermediate))
-    -- else
-      -- print('Invalid argument for deathMode!')
-    -- end
 
   -- print(opt.deathMode)
   -- print(opt.deathRate)
